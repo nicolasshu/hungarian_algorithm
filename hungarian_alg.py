@@ -2,26 +2,6 @@
 # https://python.plainenglish.io/hungarian-algorithm-introduction-python-implementation-93e7c0890e15
 import numpy as np
 
-y_true = np.array([0,0,0,0,1,1,1,2,2,2,3,3])
-y_pred = np.array([2,2,2,3,3,3,3,0,0,1,1,1])
-
-C = cost_matrix(y_true, y_pred)
-
-C = [[7,6,2,9,2],
-     [6,2,1,3,9],
-     [5,6,8,9,5],
-     [6,8,5,8,6],
-     [9,5,6,4,7]]
-
-# C = [[7,6,2,9,2],
-#      [1,2,5,3,9],
-#      [5,3,9,6,5],
-#      [9,2,5,8,7],
-#      [2,5,3,6,1]]
-C = np.array(C)
-C_ = C
-print(f"Cost Matrix:\n{C}")
-
 
 
 class HungarianAlg:
@@ -29,26 +9,126 @@ class HungarianAlg:
         pass
 
     def compute_profit_matrix(self, y_true, y_pred):
+        """Compute a profit matrix from two sets of label vectors
+
+        Args:
+            y_true (array): Array descriptive of keys representative of the
+                left vertices (i.e. input) on a bipartite graph
+            y_pred (array): Array descriptive of keys representative of the
+                right vertices (i.e. output) on a bipartite graph
+
+        Returns:
+            2D array: Two-dimensional array representative of the profit matrix
+        """
         unique_true = np.unique(y_true)
         unique_pred = np.unique(y_pred)
 
         P = np.zeros([len(unique_true), len(unique_pred)])
 
+        # For each vertex in the left
         for i,key_true in enumerate(unique_true):
+            # For each vertex in the right
             for j,key_pred in enumerate(unique_pred):
+                # Get the indices that match each of the vertices
                 inds_true = set(np.where(y_true==key_true)[0])
                 inds_pred = set(np.where(y_pred==key_pred)[0])
+
+                # Get the indices that match both vertices
                 intsec = inds_true.intersection(inds_pred)
+
+                # Compute number of matches
                 n_match = len(intsec)
                 P[i,j] = n_match
 
         return P
 
     def compute_cost_matrix(self, y_true, y_pred):
+        """Compute a cost matrix from two sets of label vectors, but first
+            computing the profit matrix, and subtracting the matrix from the
+            max value of the profit matrix
+
+        Args:
+            y_true (array): Array descriptive of keys representative of the
+                left vertices (i.e. input) on a bipartite graph
+            y_pred (array): Array descriptive of keys representative of the
+                right vertices (i.e. output) on a bipartite graph
+
+        Returns:
+            2D array: Two-dimensional array representative of the cost matrix
+        """
         self.profit_matrix = self.compute_profit_matrix(y_true, y_pred)
         return np.max(self.profit_matrix) - self.profit_matrix
 
+    def hungarian_alg(self,cost_matrix):
+        """Run the Hungarian Algorithm
+
+        Args:
+            cost_matrix (array): Array representative of the cost matrix, where
+                the rows represent the keys of the left vertices and the columns
+                represent the keys of the right vertices of the bipartite graph,
+                and the element C[i,j] represents the edge weight between the
+                ith left vertex and the jth right vertex.
+
+        Returns:
+            list of tuples: A list of tuples representative of the matching
+                of the ith index and jth index of the row / left and column /
+                right vertices of the bipartite graph
+        """
+        cost_matrix = np.array(cost_matrix)
+        C = cost_matrix.copy()
+
+        # Get important parameters
+        n_rows = C.shape[0]
+
+        # Subtract the minimum values of the rows, and then columns
+        C = self.subtract_min_of_rows_and_cols(C)
+
+        # Iterate until the number of lines that cross the zeros equals the
+        #   dimension of the matrix
+        n_lines = 0
+        while n_lines < n_rows:
+            # Mark the matrix, and get the matching
+            #   {marked_rows & marked_cols} represent the minimum vertex cover
+            matching, marked_rows, marked_cols = self.mark_matrix2(C)
+
+            # Number of lines through rows and columns
+            #     that are passing through zeros
+            n_lines = len(marked_rows) + len(marked_cols)
+
+            # If the number of lines is less than the dimension
+            #     of the matrix, adjust the weights of the edges
+            if n_lines < n_rows:
+                C = adjust_weights(C, marked_rows, marked_cols)
+
+        return matching
+
     def make_rowcol_false(self,zero_mat):
+        """Run through the weights matrix and start to zero out the rows and
+            and columns that contain zeros.
+            INPUT: A boolean matrix indicating where there are zeros in the
+                cost matrix (i.e. the weights matrix)
+
+            1. Run through the rows, and obtain the row that contains the least
+                number of zeros. If there are two rows that contain the least
+                number of zeros, then select the one whose columns that have
+                zeros have the least number of zeros. This selected row will be
+                referred to as target_row
+            2. Once you have a target_row, select the columns that have the
+                least number of zeros.
+            3. Set the values of the boolean matrix in that target row and
+                target column to be False
+            4. Append that coordinate to a =marked_zero= list
+            5. Repeat to step 1 until there are no more zeros on the cost
+               matrix (i.e. True's on the zero_mat)
+
+        Args:
+            zero_mat (array): A boolean matrix indicating where there are zeros
+                in the cost matrix
+
+        Returns:
+            list of tuples: A list of tuples indicating the coordinates which
+                were used to zero out the rows and columns of the cost matrix
+        """
         zero_mat_copy = zero_mat.copy()
 
         marked_zero = []
@@ -79,15 +159,37 @@ class HungarianAlg:
         return marked_zero
 
     def subtract_min_of_rows_and_cols(self,C):
+        """Subtract the minimum value of every row from every respective row,
+            and then subtract the minimum value of every column from every
+            respective column.
+
+        Args:
+            C (array): Array representative of the cost matrix, where the rows
+                represent the keys of the left vertices and the columns
+                represent the keys of the right vertices of the bipartite graph,
+                and the element C[i,j] represents the edge weight between the
+                ith left vertex and the jth right vertex.
+
+        Returns:
+            array: Reduced cost matrix, now containing zeros.
+        """
         C = np.array(C)
         # STEP 1: Subtract min of each row and column
         # Subtract the min of each row
         C = C - np.expand_dims(np.min(C,1),1)
 
-        # Subtract the min of each col
+        # Subtract the min of each column
         C = C - np.expand_dims(np.min(C,0),0)
         return C
     def mark_matrix(self,C):
+        """_summary_
+
+        Args:
+            C (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         C = np.array(C)
         # STEP 2-1
         zero_mat = (C == 0)
@@ -156,6 +258,32 @@ class HungarianAlg:
         return marked_zero, marked_rows, marked_cols
 
     def mark_matrix2(self,C):
+        """Start marking the cost matrix.
+            1. Create a boolean matrix based on the cost matrix, with True where
+                the elements in the cost matrix equal zero, and False otherwise
+            2. Identify the coordinates that can be marked, and thus turning
+                nonzero values into zero by calling on `make_rowcol_false()`
+                method.
+            3. Identify the non-marked rows.
+            4. Identify the columns that were marked
+            5. Identify the rows that were marked
+
+        Args:
+            C (array): Array representative of the cost matrix, where the rows
+                represent the keys of the left vertices and the columns
+                represent the keys of the right vertices of the bipartite graph,
+                and the element C[i,j] represents the edge weight between the
+                ith left vertex and the jth right vertex.
+
+        Returns:
+            tuple: Tuple containing 3 items:
+            [0] list of tuples: A list of tuples indicating the coordinates
+                which were used to zero out the rows and columns of the cost 
+                matrix
+            [1] list: A list of indices representing the rows that were marked
+            [2] list: A list of indices representing the columns that were
+                marked
+        """
         C = np.array(C)
         row_inds = np.arange(C.shape[0])
         # STEP 2-1
@@ -192,7 +320,33 @@ class HungarianAlg:
         marked_rows = list(set(row_inds) - set(non_marked_row))
         ##############################
         return marked_zero, marked_rows, marked_cols
-    def adjust_weights(self,C):
+    def adjust_weights(self,C, marked_rows, marked_cols):
+        """Given a cost matrix C, and the {marked_rows U marked_cols} create
+            the minimum vertex cover, adjust the weight matrices by the
+            following condition:
+
+        delta = min_{i not in V, j not in V} C[i,j]
+
+                  | C[i,j] - delta       (i not in V) AND (j in V)
+        C[i,j] <= | C[i,j]               (i in V) XOR (j in V)
+                  | C[i,j] + delta       (i in V) AND (j in V)
+
+        Args:
+            C (array): Array representative of the cost matrix, where the rows
+                represent the keys of the left vertices and the columns
+                represent the keys of the right vertices of the bipartite graph,
+                and the element C[i,j] represents the edge weight between the
+                ith left vertex and the jth right vertex.
+            marked_rows (list): List of indices of the left vertices of the
+                subgraph of bipartite subgraph representative of the the
+                minimum vertex cover
+            marked_cols (list): List of indices of the right vertices of the
+                subgraph of bipartite subgraph representative of the the
+                minimum vertex cover
+
+        Returns:
+            array: Adjusted cost matrix
+        """
         n_rows, n_cols = C.shape
 
         nonzero_elements = []
@@ -220,45 +374,67 @@ class HungarianAlg:
                 C[marked_row, marked_col] += Delta
 
         return C
-    def hungarian_alg(self,cost_matrix):
-        cost_matrix = np.array(cost_matrix)
-        C = cost_matrix.copy()
-
-        # Get important parameters
-        n_rows = C.shape[0]
-
-        # Subtract the minimum values of the rows, and then columns
-        C = self.subtract_min_of_rows_and_cols(C)
-
-        # Iterate: 
-        n_lines = 0
-        while n_lines < n_rows:
-            # Mark the matrix, and get the matching
-            matching, marked_rows, marked_cols = self.mark_matrix2(C)
-
-            # Number of lines through rows and columns
-            #     that are passing through zeros
-            n_lines = len(marked_rows) + len(marked_cols)
-
-            # If the number of lines is less than the dimension
-            #     of the matrix, adjust the weights of the edges
-            if n_lines < n_rows:
-                C = adjust_weights(C)
-
-        return matching
-
     def fit(self, y_true, y_pred):
+        """Create a matching between the y_true and y_pred
+
+        Args:
+            y_true (array): Array descriptive of keys representative of the
+                left vertices (i.e. input) on a bipartite graph
+            y_pred (array): Array descriptive of keys representative of the
+                right vertices (i.e. output) on a bipartite graph
+
+        Returns:
+            _type_: _description_
+        """
         self.cost_matrix = self.compute_cost_matrix(y_true, y_pred)
         self.matching = self.hungarian_alg(self.cost_matrix)
         self.map_dict = self.mapping(self.matching)
         return self.matching
 
     def mapping(self, matching):
+        """Create a mapping dictionary based on a matching
+
+        Args:
+            matching (list of tuples): tuples contain matches that relate a row
+                to a column
+
+        Returns:
+            dict: dictionary that maps the row keys (left vertices) to the
+                column keys (right vertices)
+        """
         return {match_row: match_col for (match_row, match_col) in matching}
 
     def map(self, array):
+        """Maps or assings an array to the respective matching
+
+        Args:
+            array (array): Array that will be converted to the respective match
+
+        Returns:
+            array: Matched array
+        """
         return np.array([self.map_dict[item] for item in array])
 
+
+y_true = np.array([0,0,0,0,1,1,1,2,2,2,3,3])
+y_pred = np.array([2,2,2,3,3,3,3,0,0,1,1,1])
+
+C = cost_matrix(y_true, y_pred)
+
+C = [[7,6,2,9,2],
+     [6,2,1,3,9],
+     [5,6,8,9,5],
+     [6,8,5,8,6],
+     [9,5,6,4,7]]
+
+# C = [[7,6,2,9,2],
+#      [1,2,5,3,9],
+#      [5,3,9,6,5],
+#      [9,2,5,8,7],
+#      [2,5,3,6,1]]
+C = np.array(C)
+C_ = C
+print(f"Cost Matrix:\n{C}")
 
 hunger = Hungarian()
 hunger.fit(y_true, y_pred)
