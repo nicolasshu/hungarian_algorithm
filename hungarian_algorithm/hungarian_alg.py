@@ -2,7 +2,7 @@
 # https://python.plainenglish.io/hungarian-algorithm-introduction-python-implementation-93e7c0890e15
 import numpy as np
 
-class HungarianAlg:
+class HungarianAlgorithm:
     def __init__(self, cost_matrix=None):
         if cost_matrix:
             self.cost_matrix = cost_matrix
@@ -439,57 +439,4 @@ class HungarianAlg:
         return mat
 
 
-C = [[7,6,2,9,2],
-     [1,2,5,3,9],
-     [5,3,9,6,5],
-     [9,2,5,8,7],
-     [2,5,3,6,1]]
-C = np.array(C)
-print("The cost matrix is:"); print(C)
-
-hunger = HungarianAlg()
-print("Matching...")
-hunger.match(C)
-
-print("The optimal cost is:", hunger.cost)
-print("The matching matrix is:"); print(hunger.match_matrix)
-print("The matches are:", hunger.matching)
-
 #%%
-C = [[7,6,2,9,2],
-     [6,2,1,3,9],
-     [5,6,8,9,5],
-     [6,8,5,8,6],
-     [9,5,6,4,7]]
-
-C = np.array(C)
-print("The cost matrix is:"); print(C)
-
-hunger = HungarianAlg()
-print("Matching...")
-hunger.match(C)
-
-print("The optimal cost is:", hunger.cost)
-print("The matching matrix is:"); print(hunger.match_matrix)
-print("The matches are:", hunger.matching)
-
-#%%
-y_true = np.array([0,0,0,0,1,1,1,2,2,2,3,3])
-y_pred = np.array([2,2,2,3,3,3,3,0,0,1,1,1])
-print("------ Original mapping --------------")
-print("y_true: ", y_true)
-print("y_pred: ", y_pred)
-hunger = HungarianAlg()
-hunger.fit(y_true, y_pred)
-y_new = hunger.map(y_pred)
-print("----- y_new = hunger.map(y_pred) -----")
-print("y_true: ", y_true)
-print("y_new:  ", y_new)
-y_new = hunger.map(y_true)
-print("----- y_new = hunger.map(y_true) -----")
-print("y_pred: ", y_pred)
-print("y_new:  ", y_new)
-
-#%%
-
-
