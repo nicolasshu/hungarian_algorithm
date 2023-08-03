@@ -1,0 +1,17 @@
+from hungarian_algorithm import HungarianAlgorithm
+
+y_true = np.array([0,0,0,0,1,1,1,2,2,2,3,3])
+y_pred = np.array([2,2,2,3,3,3,3,0,0,1,1,1])
+print("------ Original mapping --------------")
+print("y_true: ", y_true)
+print("y_pred: ", y_pred)
+hunger = HungarianAlgorithm()
+hunger.fit(y_true, y_pred)
+y_new = hunger.map(y_pred)
+print("----- y_new = hunger.map(y_pred) -----")
+print("y_true: ", y_true)
+print("y_new:  ", y_new)
+y_new = hunger.map(y_true)
+print("----- y_new = hunger.map(y_true) -----")
+print("y_pred: ", y_pred)
+print("y_new:  ", y_new)
