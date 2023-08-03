@@ -2,11 +2,10 @@
 # https://python.plainenglish.io/hungarian-algorithm-introduction-python-implementation-93e7c0890e15
 import numpy as np
 
-
-
 class HungarianAlg:
-    def __init__(self):
-        pass
+    def __init__(self, cost_matrix=None):
+        if cost_matrix:
+            self.cost_matrix = cost_matrix
 
     def compute_profit_matrix(self, y_true, y_pred):
         """Compute a profit matrix from two sets of label vectors
@@ -98,7 +97,7 @@ class HungarianAlg:
             # If the number of lines is less than the dimension
             #     of the matrix, adjust the weights of the edges
             if n_lines < n_rows:
-                C = adjust_weights(C, marked_rows, marked_cols)
+                C = self.adjust_weights(C, marked_rows, marked_cols)
 
         return matching
 
@@ -290,7 +289,7 @@ class HungarianAlg:
         zero_mat = (C == 0)
 
         # RETURN MARKED_ZERO #########
-        marked_zero = make_rowcol_false(zero_mat)
+        marked_zero = self.make_rowcol_false(zero_mat)
         ##############################
 
         # After the previous step, not every row/col will be marked. Only the
@@ -415,32 +414,81 @@ class HungarianAlg:
         """
         return np.array([self.map_dict[item] for item in array])
 
+    def match(self, cost_matrix = None):
 
-y_true = np.array([0,0,0,0,1,1,1,2,2,2,3,3])
-y_pred = np.array([2,2,2,3,3,3,3,0,0,1,1,1])
+        if cost_matrix is None:
+            cost_matrix = np.array(self.cost_matrix)
+        else:
+            self.cost_matrix = np.array(cost_matrix)
 
-C = cost_matrix(y_true, y_pred)
+        self.matching = self.hungarian_alg(self.cost_matrix)
+        self.map_dict = self.mapping(self.matching)
 
+    @property
+    def cost(self):
+        _cost = 0
+        for a,b in self.matching:
+            _cost += self.cost_matrix[a,b]
+        return _cost
+
+    @property
+    def match_matrix(self):
+        mat = np.zeros(self.cost_matrix.shape)
+        for a,b in self.matching:
+            mat[a,b] = self.cost_matrix[a,b]
+        return mat
+
+
+C = [[7,6,2,9,2],
+     [1,2,5,3,9],
+     [5,3,9,6,5],
+     [9,2,5,8,7],
+     [2,5,3,6,1]]
+C = np.array(C)
+print("The cost matrix is:"); print(C)
+
+hunger = HungarianAlg()
+print("Matching...")
+hunger.match(C)
+
+print("The optimal cost is:", hunger.cost)
+print("The matching matrix is:"); print(hunger.match_matrix)
+print("The matches are:", hunger.matching)
+
+#%%
 C = [[7,6,2,9,2],
      [6,2,1,3,9],
      [5,6,8,9,5],
      [6,8,5,8,6],
      [9,5,6,4,7]]
 
-# C = [[7,6,2,9,2],
-#      [1,2,5,3,9],
-#      [5,3,9,6,5],
-#      [9,2,5,8,7],
-#      [2,5,3,6,1]]
 C = np.array(C)
-C_ = C
-print(f"Cost Matrix:\n{C}")
+print("The cost matrix is:"); print(C)
 
-hunger = Hungarian()
-hunger.fit(y_true, y_pred)
-y_true, hunger.map(y_pred)
+hunger = HungarianAlg()
+print("Matching...")
+hunger.match(C)
+
+print("The optimal cost is:", hunger.cost)
+print("The matching matrix is:"); print(hunger.match_matrix)
+print("The matches are:", hunger.matching)
 
 #%%
+y_true = np.array([0,0,0,0,1,1,1,2,2,2,3,3])
+y_pred = np.array([2,2,2,3,3,3,3,0,0,1,1,1])
+print("------ Original mapping --------------")
+print("y_true: ", y_true)
+print("y_pred: ", y_pred)
+hunger = HungarianAlg()
+hunger.fit(y_true, y_pred)
+y_new = hunger.map(y_pred)
+print("----- y_new = hunger.map(y_pred) -----")
+print("y_true: ", y_true)
+print("y_new:  ", y_new)
+y_new = hunger.map(y_true)
+print("----- y_new = hunger.map(y_true) -----")
+print("y_pred: ", y_pred)
+print("y_new:  ", y_new)
 
 #%%
 
