@@ -1,4 +1,6 @@
+import numpy as np
 from hungarian_algorithm import HungarianAlgorithm
+
 C = [[7,6,2,9,2],
      [1,2,5,3,9],
      [5,3,9,6,5],
