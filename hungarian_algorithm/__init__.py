@@ -1,1 +1,2 @@
 from .hungarian_alg import HungarianAlgorithm
+from .recursive_hungarian_alg import RecursiveHungarianAlgorithm
