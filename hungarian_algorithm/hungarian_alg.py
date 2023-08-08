@@ -6,6 +6,7 @@ class HungarianAlgorithm:
     def __init__(self, cost_matrix=None):
         if cost_matrix:
             self.cost_matrix = cost_matrix
+        self.discards_exist = False
 
     def compute_profit_matrix(self, y_true, y_pred):
         """Compute a profit matrix from two sets of label vectors
@@ -19,15 +20,17 @@ class HungarianAlgorithm:
         Returns:
             2D array: Two-dimensional array representative of the profit matrix
         """
-        unique_true = np.unique(y_true)
-        unique_pred = np.unique(y_pred)
+        self.unique_true = list(np.unique(y_true))
+        self.unique_pred = list(np.unique(y_pred))
+        # print(self.unique_true, len(self.unique_true))
+        # print(self.unique_pred, len(self.unique_pred))
 
-        P = np.zeros([len(unique_true), len(unique_pred)])
+        P = np.zeros([len(self.unique_true), len(self.unique_pred)])
 
         # For each vertex in the left
-        for i,key_true in enumerate(unique_true):
+        for i,key_true in enumerate(self.unique_true):
             # For each vertex in the right
-            for j,key_pred in enumerate(unique_pred):
+            for j,key_pred in enumerate(self.unique_pred):
                 # Get the indices that match each of the vertices
                 inds_true = set(np.where(y_true==key_true)[0])
                 inds_pred = set(np.where(y_pred==key_pred)[0])
@@ -39,6 +42,22 @@ class HungarianAlgorithm:
                 n_match = len(intsec)
                 P[i,j] = n_match
 
+        if len(self.unique_true) < len(self.unique_pred):
+            n_row_pad = len(self.unique_pred) - len(self.unique_true)
+            P = np.pad(P, ((0, n_row_pad),(0,0)))
+            discard_array = [f"discard{str(k).zfill(n_row_pad//10)}"
+                                 for k in range(n_row_pad)]
+            self.unique_true += discard_array
+            self.discards_exist = True
+
+
+        if len(self.unique_true) > len(self.unique_pred):
+            n_col_pad = len(self.unique_true) - len(self.unique_pred)
+            P = np.pad(P, ((0,0), (0, n_col_pad)))
+            discard_array = [f"discard{str(k).zfill(n_col_pad//10)}"
+                                 for k in range(n_col_pad)]
+            self.unique_pred += discard_array
+            self.discards_exist = True
         return P
 
     def compute_cost_matrix(self, y_true, y_pred):
@@ -99,7 +118,10 @@ class HungarianAlgorithm:
             if n_lines < n_rows:
                 C = self.adjust_weights(C, marked_rows, marked_cols)
 
-        return matching
+        self.matching_ind = matching
+        label_matching = [(self.unique_true[i], self.unique_pred[j])
+                              for i,j in matching]
+        return label_matching
 
     def make_rowcol_false(self,zero_mat):
         """Run through the weights matrix and start to zero out the rows and
@@ -382,7 +404,7 @@ class HungarianAlgorithm:
             y_pred (array): Array descriptive of keys representative of the
                 right vertices (i.e. output) on a bipartite graph
 
-        Returns:
+        returns:
             _type_: _description_
         """
         self.cost_matrix = self.compute_cost_matrix(y_true, y_pred)
@@ -401,7 +423,19 @@ class HungarianAlgorithm:
             dict: dictionary that maps the row keys (left vertices) to the
                 column keys (right vertices)
         """
-        return {match_row: match_col for (match_row, match_col) in matching}
+        map_dict = {}
+        for match_row, match_col in matching:
+            is_row_discard = isinstance(match_row, str) and ("discard" in match_row)
+            is_col_discard = isinstance(match_col, str) and ("discard" in match_col)
+            # if isinstance(match_row, str) or isinstance(match_col, str):
+            #     if ("discard" not in match_row) and ("discard" not in match_col):
+            if is_row_discard or is_col_discard:
+                continue
+            else:
+                map_dict[match_col] = match_row
+
+
+        return map_dict
 
     def map(self, array):
         """Maps or assings an array to the respective matching
@@ -433,8 +467,8 @@ class HungarianAlgorithm:
 
     @property
     def match_matrix(self):
-        mat = np.zeros(self.cost_matrix.shape)
-        for a,b in self.matching:
+        mat = np.ones(self.cost_matrix.shape) * np.nan
+        for a,b in self.matching_ind:
             mat[a,b] = self.cost_matrix[a,b]
         return mat
 
