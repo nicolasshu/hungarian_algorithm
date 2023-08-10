@@ -1,5 +1,9 @@
 import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
 from hungarian_algorithm import HungarianAlgorithm
+import logging
+import ipdb
 
 class RecursiveHungarianAlgorithm:
     def __init__(self):
@@ -25,14 +29,20 @@ class RecursiveHungarianAlgorithm:
 
 
         while len(self.matching) < max(self.n_workers, self.n_jobs):
+            # ipdb.set_trace()
             cost_matrix, workers, jobs = self.recurse(cost_matrix,
                                                       workers,
                                                       jobs)
 
-            if 1 not in cost_matrix.shape:
+            # print(cost_matrix, workers, jobs)
+            if 0 in cost_matrix.shape:
+                break
+            elif 1 not in cost_matrix.shape:
                 # If the output of recursion is a 1D array, don't pad the
                 #     the cost matrix. The self.recurse() will take care of it
                 cost_matrix = self.pad_cost_matrix(cost_matrix)
+                workers, jobs = self.pad_workers_jobs(workers, jobs)
+                # print(cost_matrix, workers, jobs)
 
         # print("----- INITIALIZING -----")
         # print("N_w   N_j   len(match)",self.n_workers, self.n_jobs, len(self.matching))
@@ -62,6 +72,18 @@ class RecursiveHungarianAlgorithm:
         # print(f"N_w={self.n_workers}   N_j={self.n_jobs}   len(match)={len(self.matching)}")
         # print("Matching:",self.matching)
 
+        # Create a Graph
+        self.match_dict = {job: worker for worker, job in self.matching}
+        self.graph = nx.DiGraph()
+        # self.graph.add_nodes_from(list(map(self.wname, self.unique_workers)))
+        # self.graph.add_nodes_from(list(map(self.jname, self.unique_jobs)))
+        self.graph.add_nodes_from(self.unique_workers)
+        self.graph.add_nodes_from(self.unique_jobs)
+
+        for worker, job in self.matching:
+            # self.graph.add_edge(self.wname(worker), self.jname(job))
+            self.graph.add_edge(worker, job)
+
 
     def recurse(self, cost_matrix, workers, jobs):
 
@@ -78,40 +100,71 @@ class RecursiveHungarianAlgorithm:
 
             return new_cost_matrix, new_workers, new_jobs
 
+        # print(cost_matrix)      # 
+        n_workers = len(workers["inds"])
+        n_jobs = len(jobs["inds"])
+
         matching = self.munkres.hungarian_alg(cost_matrix)
         matching_ind = self.munkres.matching_ind
+        # ipdb.set_trace()
         keep_rows, drop_cols = [], []
         keep_cols, drop_rows = [], []
-        for match_names, match_inds in zip(matching, matching_ind):
+        # for match_names, match_inds in zip(matching, matching_ind):
+        for match_inds in matching_ind:
             w_ind, j_ind = match_inds
-            w_name, j_name = match_names
-            if ("discard" not in w_name) and ("discard" not in j_name):
+            if (w_ind >= len(workers["names"])) or (j_ind >= len(workers["names"])):
+                continue
+            # print((w_ind, j_ind), [len(workers["names"]), len(jobs["names"])])
+            # ipdb.set_trace()
+
+            w_name, j_name = workers["names"][w_ind], jobs["names"][j_ind]
+            if ("discard" not in str(w_name)) and ("discard" not in str(j_name)):
+                # try:
                 self.matching.append(
                     (workers["names"][w_ind], jobs["names"][j_ind]))
                 self.matching_ind.append(
                     (workers["inds"][w_ind], jobs["inds"][j_ind]))
-                if self.n_workers < self.n_jobs:
+                # except:
+                #     print(matching)
+                #     print(matching_ind)
+                #     print(np.unique([w for w,j in matching]))
+                #     print(np.unique([j for w,j in matching]))
+                #     print("-------------")
+                #     print(w_ind, j_ind, w_name, j_name)
+                #     print(workers, jobs)
+                #     raise Exception()
+                if n_workers < self.n_jobs:
+                    # print(f"Adding {w_ind} to keep rows")
+                    # print(f"Adding {j_ind} to drop_cols")
                     keep_rows.append(w_ind)
                     drop_cols.append(j_ind)
-                elif self.n_workers > self.n_jobs:
+                elif n_workers > self.n_jobs:
+                    # print(f"Adding {w_ind} to drop_rows")
+                    # print(f"Adding {j_ind} to keep_cols")
                     drop_rows.append(w_ind)
                     keep_cols.append(j_ind)
 
                 # print((workers["names"][w_ind], jobs["names"][j_ind]))
                 # print((workers["inds"][w_ind], jobs["inds"][j_ind]))
+            elif ("discard" in str(w_name)):
+                drop_rows.append(w_ind)
+            elif ("discard" in str(j_name)):
+                drop_cols.append(j_ind)
 
 
-        if self.n_workers < self.n_jobs:
+
+        if n_workers < self.n_jobs:
             keep_rows = sorted(keep_rows)
             all_cols = {k for k in range(cost_matrix.shape[1])}
             keep_cols = list(all_cols - set(drop_cols))
-        elif self.n_workers > self.n_jobs:
+        elif n_workers > self.n_jobs:
             keep_cols = sorted(keep_cols)
             all_rows = {k for k in range(cost_matrix.shape[0])}
             keep_rows = list(all_rows - set(drop_rows))
 
-        # print("    Rows to keep: ", keep_rows)
-        # print("    Cols to keep: ", keep_cols)
+        print("    Rows to keep: ", keep_rows)
+        print("    Cols to keep: ", keep_cols)
+        # ipdb.set_trace()
         new_workers = {
             "names": list(np.array(workers["names"])[keep_rows]),
             "inds": list(np.array(workers["inds"])[keep_rows])
@@ -125,6 +178,7 @@ class RecursiveHungarianAlgorithm:
         new_cost_matrix = cost_matrix
         new_cost_matrix = new_cost_matrix[keep_rows,:]
         new_cost_matrix = new_cost_matrix[:,keep_cols]
+        # ipdb.set_trace()
 
         return new_cost_matrix, new_workers, new_jobs
 
@@ -144,3 +198,66 @@ class RecursiveHungarianAlgorithm:
         for a,b in self.matching_ind:
             mat[a,b] = self.cost_matrix[a,b]
         return mat
+
+    @property
+    def match_status(self):
+        if self.n_workers == self.n_jobs:
+            logging.info("There are as many workers as jobs")
+            return 0
+        elif self.n_workers > self.n_jobs:
+            logging.info("There are more workers than jobs")
+            return 1
+        else:
+            logging.info("There are less workers than jobs")
+            return -1
+
+    @property
+    def shortfat(self):
+        if self.match_status < 0:
+            return True
+        else:
+            return False
+
+    @property
+    def tallskinny(self):
+        if self.match_status > 0:
+            return True
+        else:
+            return False
+
+    @property
+    def square(self):
+        if self.match_status == 0:
+            return True
+        else:
+            return False
+
+
+    def wname(self,name):
+        return f"w_{name}"
+    def jname(self,name):
+        return f"j_{name}"
+
+    def view_graph(self, **kwargs):
+        fig, ax = plt.subplots(**kwargs)
+        nx.draw(self.graph, with_labels=True, ax=ax)
+
+        return fig, ax
+
+    def pad_workers_jobs(self, workers, jobs):
+        n_workers = len(workers["names"])
+        n_jobs = len(jobs["names"])
+        if n_workers < n_jobs:
+            n_row_pad = n_jobs - n_workers
+            discard_array = [f"discard{str(k).zfill(n_row_pad//10)}"
+                                 for k in range(n_row_pad)]
+            workers["names"] += discard_array
+            # workers["inds"] = np.arange(len(workers["names"]))
+
+        if n_workers > n_jobs:
+            n_col_pad = n_workers - n_jobs
+            discard_array = [f"discard{str(k).zfill(n_col_pad//10)}"
+                                 for k in range(n_col_pad)]
+            jobs["names"] += discard_array
+            # jobs["inds"] = np.arange(len(jobs["names"]))
+        return workers, jobs

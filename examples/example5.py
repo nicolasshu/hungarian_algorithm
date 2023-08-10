@@ -25,3 +25,7 @@ print("Padded Cost Matrix (obj.cost_matrix):")
 print(rhunger.cost_matrix)
 print("Match Matrix (obj.match_matrix):")
 print(rhunger.match_matrix)
+
+rhunger.view_graph()
+import matplotlib.pyplot as plt
+plt.show()
