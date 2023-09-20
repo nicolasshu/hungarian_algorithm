@@ -1,6 +1,8 @@
 #%%
 # https://python.plainenglish.io/hungarian-algorithm-introduction-python-implementation-93e7c0890e15
 import numpy as np
+import networkx as nx
+import matplotlib.pyplot as plt
 
 class HungarianAlgorithm:
     def __init__(self, cost_matrix=None):
@@ -22,6 +24,10 @@ class HungarianAlgorithm:
         """
         self.unique_true = list(np.unique(y_true))
         self.unique_pred = list(np.unique(y_pred))
+
+        self.unique_workers = [f"w_{it}" for it in self.unique_true]
+        self.unique_jobs = [f"j_{it}" for it in self.unique_pred]
+
         # print(self.unique_true, len(self.unique_true))
         # print(self.unique_pred, len(self.unique_pred))
 
@@ -410,6 +416,15 @@ class HungarianAlgorithm:
         self.cost_matrix = self.compute_cost_matrix(y_true, y_pred)
         self.matching = self.hungarian_alg(self.cost_matrix)
         self.map_dict = self.mapping(self.matching)
+
+        self.graph = nx.DiGraph()
+        self.graph.add_nodes_from(self.unique_workers)
+        self.graph.add_nodes_from(self.unique_jobs)
+        for worker, job in self.matching:
+            w = f"w_{worker}"
+            j = f"j_{job}"
+            self.graph.add_edge(j,w)
+
         return self.matching
 
     def mapping(self, matching):
@@ -437,6 +452,13 @@ class HungarianAlgorithm:
 
         return map_dict
 
+    def view_graph(self, **kwargs):
+        fig, ax = plt.subplots(**kwargs)
+        worker_nodes = [f"w_{w}" for w,j in self.matching]
+        pos = nx.bipartite_layout(self.graph, worker_nodes)
+        nx.draw(self.graph, pos=pos, with_labels = True, ax=ax, node_color="lightgray", node_size=600)
+
+        return fig, ax
     def map(self, array):
         """Maps or assings an array to the respective matching
 
@@ -446,7 +468,15 @@ class HungarianAlgorithm:
         Returns:
             array: Matched array
         """
-        return np.array([self.map_dict[item] for item in array])
+        mapped_output = []
+        for item in array:
+            if item in self.map_dict.keys():
+                label = self.map_dict[item]
+            else:
+                label = np.nan
+            mapped_output.append(label)
+
+        return mapped_output
 
     def match(self, cost_matrix = None):
 
